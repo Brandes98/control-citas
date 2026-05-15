@@ -171,29 +171,25 @@
 <body>
 <div id="root">
   <div id="auth-screen">
-    <div class="auth-card">
-      <div class="auth-logo">🏥</div>
-      <div class="auth-title">Clínica · Citas Médicas</div>
-      <div class="auth-sub">Ingresá con tu usuario y contraseña para acceder al sistema.</div>
-      <div id="script-url-warning" style="display: block; margin-bottom: 14px; padding: 10px 12px; background: var(--amber-bg); border: 1px solid var(--amber-dark); border-radius: var(--radius-sm); font-size: 12px; color: var(--amber); text-align: left;">
-        <strong style="display:block;margin-bottom:6px">⚙ Falta la Script URL</strong>
-        Pegá tu Google Apps Script Web App URL y hacé clic en Guardar URL para activar la base de datos.
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;font-size:11px">
-          <button class="btn btn-sm btn-primary" onclick="applyScriptUrl()">Guardar URL</button>
+    <div class="auth-card" style="max-width:560px;text-align:left">
+      <div style="font-size:22px;font-weight:700;margin-bottom:6px">⚙ Configuración de Google Drive</div>
+      <div style="color:var(--text2);font-size:13px;margin-bottom:20px">Solo se hace una vez. 5 minutos.</div>
+      <div class="setup-steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text">Ir a <strong><a href="https://console.cloud.google.com" target="_blank" style="color:var(--blue)">console.cloud.google.com</a></strong> y crear un proyecto nuevo.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">En el menú: <strong>APIs &amp; Services → Library</strong>. Buscar y habilitar <strong>Google Drive API</strong>.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong>. Tipo: <strong>Web application</strong>.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">En <strong>Authorized JavaScript origins</strong> agregar la URL donde abrís este archivo (ej: <code style="color:var(--blue)">http://localhost</code> o el dominio donde lo hosteés).</div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-text">Copiar el <strong>Client ID</strong> generado:</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="client-id-input" placeholder="xxxx.apps.googleusercontent.com" style="flex:1">
+          <button class="btn btn-primary" onclick="applyClientId()">Aplicar</button>
         </div>
+        <div class="step"><div class="step-num">6</div><div class="step-text">O bien, abrí este archivo HTML en un editor de texto y reemplazá <code style="color:var(--amber)">274802525149-s7k98dd3j1cpqfucbeoilumd8jhmgho8.apps.googleusercontent.com</code> con tu Client ID, guardá y recargá.</div></div>
       </div>
-      <div class="form-group" style="margin-bottom:12px;text-align:left">
-        <label class="form-label">Usuario</label>
-        <input id="login-user" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')signIn()">
+      <div style="margin-top:20px;display:flex;gap:8px">
+        <button class="btn" onclick="setState({view:'auth'})">← Volver</button>
+        <button class="btn btn-success" onclick="signOut()">Usar sin Google por ahora</button>
       </div>
-      <div class="form-group" style="margin-bottom:16px;text-align:left">
-        <label class="form-label">Contraseña</label>
-        <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()">
-      </div>
-      <div id="login-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px;text-align:left">Usuario o contraseña incorrectos</div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="signIn()">Ingresar</button>
-      <div style="margin-top:16px;font-size:11px;color:var(--text3)">Los datos se guardan localmente en este navegador.</div>
     </div>
   </div></div>
 
@@ -360,14 +356,7 @@ function renderAuth() {
       <div class="auth-logo">🏥</div>
       <div class="auth-title">Clínica · Citas Médicas</div>
       <div class="auth-sub">Ingresá con tu usuario y contraseña para acceder al sistema.</div>
-      <div id="script-url-warning" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-dark);border-radius:var(--radius-sm);font-size:12px;color:var(--amber);text-align:left">
-        <strong style="display:block;margin-bottom:6px">⚙ Falta la Script URL</strong>
-        Pegá tu Google Apps Script Web App URL y hacé clic en Guardar URL para activar la base de datos.
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;font-size:11px">
-          <button class="btn btn-sm btn-primary" onclick="applyScriptUrl()">Guardar URL</button>
-        </div>
-      </div>
+
       <div class="form-group" style="margin-bottom:12px;text-align:left">
         <label class="form-label">Usuario</label>
         <input id="login-user" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')signIn()">
@@ -378,7 +367,7 @@ function renderAuth() {
       </div>
       <div id="login-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px;text-align:left">Usuario o contraseña incorrectos</div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="signIn()">Ingresar</button>
-      <div style="margin-top:16px;font-size:11px;color:var(--text3)">Los datos se guardan localmente en este navegador.</div>
+      <div style="margin-top:16px;font-size:11px;color:var(--text3)">Los datos se sincronizan con Google Sheets.</div>
     </div>
   </div>`;
 }
@@ -788,14 +777,8 @@ function applyScriptUrl() {
   showToast('Descargando archivo actualizado... subilo a GitHub', 'success');
 }
 
-function checkScriptUrl() {
-  const warn = document.getElementById('script-url-warning');
-  if (warn && SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxlc03i7CgPbdxWRZr9hp27Ccxbg6VhXL25XTWiF4gPpZU5H2tFR_n949qXgxZ_XEystQ/exec') warn.style.display = 'block';
-}
 
 render();
-// Show warning if SCRIPT_URL not set
-setTimeout(checkScriptUrl, 100);
 </script>
 
 
