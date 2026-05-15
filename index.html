@@ -188,7 +188,7 @@
       </div>
       <div style="margin-top:20px;display:flex;gap:8px">
         <button class="btn" onclick="setState({view:'auth'})">← Volver</button>
-        <button class="btn btn-success" onclick="useLocalStorage()">Usar sin Google por ahora</button>
+        <button class="btn btn-success" onclick="signOut()">Usar sin Google por ahora</button>
       </div>
     </div>
   </div></div>
@@ -366,44 +366,7 @@ function renderAuth() {
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="signIn()">Ingresar</button>
       <div style="margin-top:16px;font-size:11px;color:var(--text3)">Los datos se guardan localmente en este navegador.</div>
     </div>
-  </div>\`;
-}
-
-function renderSetup() {
-  return `
-  <div id="auth-screen">
-    <div class="auth-card" style="max-width:560px;text-align:left">
-      <div style="font-size:22px;font-weight:700;margin-bottom:6px">⚙ Configuración de Google Drive</div>
-      <div style="color:var(--text2);font-size:13px;margin-bottom:20px">Solo se hace una vez. 5 minutos.</div>
-      <div class="setup-steps">
-        <div class="step"><div class="step-num">1</div><div class="step-text">Ir a <strong><a href="https://console.cloud.google.com" target="_blank" style="color:var(--blue)">console.cloud.google.com</a></strong> y crear un proyecto nuevo.</div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-text">En el menú: <strong>APIs &amp; Services → Library</strong>. Buscar y habilitar <strong>Google Drive API</strong>.</div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong>. Tipo: <strong>Web application</strong>.</div></div>
-        <div class="step"><div class="step-num">4</div><div class="step-text">En <strong>Authorized JavaScript origins</strong> agregar la URL donde abrís este archivo (ej: <code style="color:var(--blue)">http://localhost</code> o el dominio donde lo hosteés).</div></div>
-        <div class="step"><div class="step-num">5</div><div class="step-text">Copiar el <strong>Client ID</strong> generado:</div></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="client-id-input" placeholder="xxxx.apps.googleusercontent.com" style="flex:1">
-          <button class="btn btn-primary" onclick="applyClientId()">Aplicar</button>
-        </div>
-        <div class="step"><div class="step-num">6</div><div class="step-text">O bien, abrí este archivo HTML en un editor de texto y reemplazá <code style="color:var(--amber)">%%GOOGLE_CLIENT_ID%%</code> con tu Client ID, guardá y recargá.</div></div>
-      </div>
-      <div style="margin-top:20px;display:flex;gap:8px">
-        <button class="btn" onclick="setState({view:'auth'})">← Volver</button>
-        <button class="btn btn-success" onclick="useLocalStorage()">Usar sin Google por ahora</button>
-      </div>
-    </div>
   </div>`;
-}
-
-function applyClientId() {
-  const v = document.getElementById('client-id-input').value.trim();
-  if (!v) return;
-  // patch and reload
-  const html = document.documentElement.outerHTML.replace('%%GOOGLE_CLIENT_ID%%', v);
-  const blob = new Blob([html], {type:'text/html'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'clinica-app.html'; a.click();
-  showToast('Descargando archivo actualizado...', 'success');
 }
 
 function renderTopbar() {
