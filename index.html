@@ -302,6 +302,16 @@ function getSeedData() {
 }
 
 // ── STATE / RENDER ─────────────────────────────────────────────────────────
+let state = {
+  view: 'auth',
+  doctors: [], patients: [], citas: [],
+  selectedDoctor: null, selectedPatient: null,
+  token: null, currentUser: null,
+  modal: null,
+  search: '', filterStatus: 'all',
+  loading: false, saving: false
+};
+
 function setState(patch) { Object.assign(state, patch); render(); }
 
 function getStatus(cita) {
