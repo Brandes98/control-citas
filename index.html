@@ -194,124 +194,81 @@
   </div></div>
 
 <script>
-const CLIENT_ID = '274802525149-s7k98dd3j1cpqfucbeoilumd8jhmgho8.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
-const FILE_NAME = 'clinica_data.json';
-const COLORS = ['#1F6FEB','#238636','#9E6A03','#8250DF','#DA3633','#0969DA','#2DA44E','#953800'];
+// ── CONFIG ────────────────────────────────────────────────────────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxlc03i7CgPbdxWRZr9hp27Ccxbg6VhXL25XTWiF4gPpZU5H2tFR_n949qXgxZ_XEystQ/exec';
 
-let state = {
-  view: 'auth', // auth | setup | doctors | patients | citas
-  doctors: [], patients: [], citas: [],
-  selectedDoctor: null, selectedPatient: null,
-  token: null, fileId: null,
-  modal: null, // { type, data }
-  search: '', filterStatus: 'all',
-  loading: false, saving: false
-};
-
-// ── GOOGLE AUTH ────────────────────────────────────────────────────────────
-function loadGapiScript() {
-  return new Promise(res => {
-    if (window.google?.accounts) { res(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.onload = res; document.head.appendChild(s);
-  });
+// ── API CALLS ──────────────────────────────────────────────────────────────
+async function api(params) {
+  const url = SCRIPT_URL + '?' + new URLSearchParams(params);
+  const res = await fetch(url);
+  return res.json();
 }
 
-function loadDriveScript() {
-  return new Promise(res => {
-    if (window.gapi?.client) { res(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://apis.google.com/js/api.js';
-    s.onload = () => { gapi.load('client', res); };
-    document.head.appendChild(s);
+async function apiPost(body) {
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
+  return res.json();
 }
 
+// ── AUTH ───────────────────────────────────────────────────────────────────
 async function signIn() {
-  if (!CLIENT_ID || CLIENT_ID === '%%GOOGLE_CLIENT_ID%%') { setState({ view: 'setup' }); return; }
+  if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxlc03i7CgPbdxWRZr9hp27Ccxbg6VhXL25XTWiF4gPpZU5H2tFR_n949qXgxZ_XEystQ/exec') {
+    showToast('Falta configurar la Script URL', 'error'); return;
+  }
+  const u = document.getElementById('login-user')?.value.trim();
+  const p = document.getElementById('login-pass')?.value.trim();
+  if (!u || !p) { document.getElementById('login-err').style.display='block'; return; }
   setState({ loading: true });
   try {
-    await loadGapiScript();
-    await loadDriveScript();
-    await gapi.client.init({
-      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
-    });
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      prompt: '',
-      callback: async (resp) => {
-        if (resp.error) {
-          setState({ loading: false });
-          showToast('Error: ' + (resp.error_description || resp.error), 'error');
-          return;
-        }
-        state.token = resp.access_token;
-        gapi.client.setToken({ access_token: resp.access_token });
-        try { await loadOrCreateFile(); }
-        catch(e) { setState({ loading: false }); showToast('Error Drive: ' + e.message, 'error'); }
-      },
-      error_callback: (err) => {
-        setState({ loading: false });
-        if (err.type === 'popup_blocked_by_browser') {
-          showToast('Popup bloqueado — habilitá popups para este sitio', 'error');
-        } else { showToast('Error de autenticación: ' + err.type, 'error'); }
-      }
-    });
-    client.requestAccessToken({ prompt: 'consent' });
-  } catch(e) { setState({ loading: false }); showToast('Error: ' + e.message, 'error'); }
-}
-
-async function loadOrCreateFile() {
-  try {
-    const res = await gapi.client.drive.files.list({
-      spaces: 'appDataFolder',
-      q: `name='${FILE_NAME}'`,
-      fields: 'files(id,name)'
-    });
-    const files = res.result.files;
-    if (files.length > 0) { state.fileId = files[0].id; await loadData(); }
-    else { await createFile(); }
+    const res = await api({ action: 'login', user: u, pass: p });
+    if (!res.ok) {
+      setState({ loading: false });
+      document.getElementById('login-err').style.display = 'block';
+      return;
+    }
+    state.token = u;
+    state.currentUser = res.nombre;
+    await loadData();
     setState({ view: 'doctors', loading: false });
   } catch(e) {
     setState({ loading: false });
-    const msg = e.result?.error?.message || e.message || 'Error';
-    showToast('Error Drive: ' + msg, 'error');
+    showToast('Error de conexion: ' + e.message, 'error');
   }
 }
 
-async function saveData() {
-  if (!state.fileId || !state.token) return;
+async function loadData() {
+  const res = await api({ action: 'getData' });
+  if (!res.ok) throw new Error(res.error || 'Error cargando datos');
+  state.doctors  = res.doctors  || [];
+  state.patients = res.patients || [];
+  state.citas    = res.citas    || [];
+}
+
+async function save() {
   setState({ saving: true });
   try {
-    const body = JSON.stringify({ doctors: state.doctors, patients: state.patients, citas: state.citas });
-    const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.fileId}?uploadType=media`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': 'application/json' },
-      body
+    const res = await apiPost({
+      action: 'save',
+      doctors:  state.doctors,
+      patients: state.patients,
+      citas:    state.citas,
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error(res.error);
     setState({ saving: false });
-    showToast('Guardado en Drive ✓', 'success');
-  } catch(e) { setState({ saving: false }); showToast('Error guardando: ' + e.message, 'error'); }
+    showToast('Guardado en Sheets ✓', 'success');
+  } catch(e) {
+    setState({ saving: false });
+    showToast('Error guardando: ' + e.message, 'error');
+  }
 }
 
-// Local fallback (sin Google)
-function useLocalStorage() {
-  const raw = localStorage.getItem('clinica_data');
-  if (raw) { const d = JSON.parse(raw); state.doctors = d.doctors||[]; state.patients = d.patients||[]; state.citas = d.citas||[]; }
-  else { const s = getSeedData(); state.doctors=s.doctors; state.patients=s.patients; state.citas=s.citas; }
-  state.token = 'local'; setState({ view: 'doctors' });
+function signOut() {
+  state.token = null; state.currentUser = null;
+  state.doctors = []; state.patients = []; state.citas = [];
+  setState({ view: 'auth', selectedDoctor: null, selectedPatient: null });
 }
-
-function saveLocal() {
-  localStorage.setItem('clinica_data', JSON.stringify({ doctors: state.doctors, patients: state.patients, citas: state.citas }));
-  showToast('Guardado localmente ✓', 'success');
-}
-
-function save() { if (state.token === 'local') saveLocal(); else saveData(); }
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────
 function getSeedData() {
@@ -365,7 +322,7 @@ function uid() { return 'x' + Math.random().toString(36).slice(2,10); }
 function render() {
   const root = document.getElementById('root');
   if (state.view === 'auth') { root.innerHTML = renderAuth(); return; }
-  if (state.view === 'setup') { root.innerHTML = renderSetup(); return; }
+
   root.innerHTML = `
     ${state.loading ? `<div class="loading-overlay"><div class="spinner"></div> Cargando datos...</div>` : ''}
     <div id="app">
@@ -388,16 +345,28 @@ function renderAuth() {
     <div class="auth-card">
       <div class="auth-logo">🏥</div>
       <div class="auth-title">Clínica · Citas Médicas</div>
-      <div class="auth-sub">Sistema de gestión de doctores, pacientes y citas médicas. Los datos se guardan de forma segura en tu Google Drive.</div>
-      <button class="google-btn" onclick="signIn()">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Continuar con Google
-      </button>
-      <div style="margin:12px 0;display:flex;align-items:center;gap:10px"><hr style="flex:1;border-color:var(--border)"><span style="color:var(--text3);font-size:12px">o</span><hr style="flex:1;border-color:var(--border)"></div>
-      <button class="btn" style="width:100%;justify-content:center" onclick="useLocalStorage()">Usar sin Google (datos locales)</button>
-      <div class="setup-note"><strong>⚙ ¿Primera vez?</strong> Si es la primera vez que usás esta app con Google, necesitás configurar un Client ID. <span style="cursor:pointer;text-decoration:underline" onclick="setState({view:'setup'})">Ver instrucciones →</span></div>
+      <div class="auth-sub">Ingresá con tu usuario y contraseña para acceder al sistema.</div>
+      <div id="script-url-warning" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-dark);border-radius:var(--radius-sm);font-size:12px;color:var(--amber);text-align:left">
+        <strong style="display:block;margin-bottom:6px">⚙ Falta la Script URL</strong>
+        Pegá tu Google Apps Script Web App URL y hacé clic en Guardar URL para activar la base de datos.
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;font-size:11px">
+          <button class="btn btn-sm btn-primary" onclick="applyScriptUrl()">Guardar URL</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;text-align:left">
+        <label class="form-label">Usuario</label>
+        <input id="login-user" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')signIn()">
+      </div>
+      <div class="form-group" style="margin-bottom:16px;text-align:left">
+        <label class="form-label">Contraseña</label>
+        <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()">
+      </div>
+      <div id="login-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px;text-align:left">Usuario o contraseña incorrectos</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="signIn()">Ingresar</button>
+      <div style="margin-top:16px;font-size:11px;color:var(--text3)">Los datos se guardan localmente en este navegador.</div>
     </div>
-  </div>`;
+  </div>\`;
 }
 
 function renderSetup() {
@@ -439,9 +408,7 @@ function applyClientId() {
 
 function renderTopbar() {
   const saving = state.saving ? `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><div class="spinner"></div>Guardando...</div>` : '';
-  const driveIcon = state.token && state.token !== 'local'
-    ? `<span style="font-size:11px;color:var(--green);background:var(--green-bg);padding:3px 8px;border-radius:20px;border:1px solid var(--green-dark)">● Drive</span>`
-    : `<span style="font-size:11px;color:var(--amber);background:var(--amber-bg);padding:3px 8px;border-radius:20px;border:1px solid var(--amber-dark)">● Local</span>`;
+  const driveIcon = '';
 
   let bc = `<span onclick="setState({view:'doctors',selectedDoctor:null,selectedPatient:null})" style="cursor:pointer;color:var(--blue)">Doctores</span>`;
   if (state.view === 'patients' && state.selectedDoctor) {
@@ -459,7 +426,11 @@ function renderTopbar() {
       <div class="logo">🏥 Clínica</div>
       <div class="breadcrumb">${bc}</div>
     </div>
-    <div class="topbar-right">${saving}${driveIcon}</div>
+    <div class="topbar-right">
+      ${saving}
+      <span style="font-size:12px;color:var(--text2)">${state.currentUser||''}</span>
+      <button class="btn btn-sm" onclick="signOut()">Salir</button>
+    </div>
   </div>`;
 }
 
@@ -827,7 +798,27 @@ function showToast(msg, type='') {
 function attachEvents() {}
 
 // ── INIT ───────────────────────────────────────────────────────────────────
+function applyScriptUrl() {
+  const url = document.getElementById('script-url-input')?.value.trim();
+  if (!url || !url.includes('script.google.com')) {
+    showToast('URL inválida', 'error'); return;
+  }
+  // Download updated file with URL baked in
+  const html = document.documentElement.outerHTML.replace('https://script.google.com/macros/s/AKfycbxlc03i7CgPbdxWRZr9hp27Ccxbg6VhXL25XTWiF4gPpZU5H2tFR_n949qXgxZ_XEystQ/exec', url);
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'index.html'; a.click();
+  showToast('Descargando archivo actualizado... subilo a GitHub', 'success');
+}
+
+function checkScriptUrl() {
+  const warn = document.getElementById('script-url-warning');
+  if (warn && SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxlc03i7CgPbdxWRZr9hp27Ccxbg6VhXL25XTWiF4gPpZU5H2tFR_n949qXgxZ_XEystQ/exec') warn.style.display = 'block';
+}
+
 render();
+// Show warning if SCRIPT_URL not set
+setTimeout(checkScriptUrl, 100);
 </script>
 
 
