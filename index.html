@@ -228,7 +228,7 @@ function loadDriveScript() {
 }
 
 async function signIn() {
-  if (CLIENT_ID === '%%GOOGLE_CLIENT_ID%%') { setState({ view: 'setup' }); return; }
+  if (!CLIENT_ID || CLIENT_ID === '%%GOOGLE_CLIENT_ID%%') { setState({ view: 'setup' }); return; }
   try {
     await loadGapiScript();
     await loadDriveScript();
@@ -301,7 +301,7 @@ async function saveData() {
 function useLocalStorage() {
   const raw = localStorage.getItem('clinica_data');
   if (raw) { const d = JSON.parse(raw); state.doctors = d.doctors||[]; state.patients = d.patients||[]; state.citas = d.citas||[]; }
-  else { const s = getSeedData(); state.doctors=s.doctors; state.patients=s.patients; state.citas=s.citas; }
+  else { const s = getSeedData(); state.doctors=s.doctors; state.patients=s.patients; state.citas=s.citas; saveLocal(); }
   state.token = 'local'; setState({ view: 'doctors' });
 }
 
@@ -394,7 +394,7 @@ function renderAuth() {
       </button>
       <div style="margin:12px 0;display:flex;align-items:center;gap:10px"><hr style="flex:1;border-color:var(--border)"><span style="color:var(--text3);font-size:12px">o</span><hr style="flex:1;border-color:var(--border)"></div>
       <button class="btn" style="width:100%;justify-content:center" onclick="useLocalStorage()">Usar sin Google (datos locales)</button>
-      <div class="setup-note"><strong>⚙ ¿Primera vez?</strong> Si es la primera vez que usás esta app con Google, necesitás configurar un Client ID. <span style="cursor:pointer;text-decoration:underline" onclick="setState({view:'setup'})">Ver instrucciones →</span></div>
+
     </div>
   </div>`;
 }
@@ -426,9 +426,9 @@ function renderSetup() {
 }
 
 function applyClientId() {
-  const v = document.getElementById('client-id-input').value.trim();
-  if (!v) return;
-  // patch and reload
+  const input = document.getElementById('client-id-input');
+  const v = input ? input.value.trim() : '';
+  if (!v) { showToast('Pegá tu Client ID primero', 'error'); return; }
   const html = document.documentElement.outerHTML.replace('%%GOOGLE_CLIENT_ID%%', v);
   const blob = new Blob([html], {type:'text/html'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
