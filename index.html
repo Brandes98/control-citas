@@ -212,6 +212,7 @@ let state = {
 // ── GOOGLE AUTH ────────────────────────────────────────────────────────────
 function loadGapiScript() {
   return new Promise(res => {
+    if (window.google?.accounts) { res(); return; }
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
     s.onload = res; document.head.appendChild(s);
@@ -220,6 +221,7 @@ function loadGapiScript() {
 
 function loadDriveScript() {
   return new Promise(res => {
+    if (window.gapi?.client) { res(); return; }
     const s = document.createElement('script');
     s.src = 'https://apis.google.com/js/api.js';
     s.onload = () => { gapi.load('client', res); };
@@ -229,25 +231,40 @@ function loadDriveScript() {
 
 async function signIn() {
   if (!CLIENT_ID || CLIENT_ID === '%%GOOGLE_CLIENT_ID%%') { setState({ view: 'setup' }); return; }
+  setState({ loading: true });
   try {
     await loadGapiScript();
     await loadDriveScript();
-    await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+    await gapi.client.init({
+      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
+    });
     const client = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID, scope: SCOPES,
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      prompt: '',
       callback: async (resp) => {
-        if (resp.error) { showToast('Error al conectar con Google', 'error'); return; }
+        if (resp.error) {
+          setState({ loading: false });
+          showToast('Error: ' + (resp.error_description || resp.error), 'error');
+          return;
+        }
         state.token = resp.access_token;
         gapi.client.setToken({ access_token: resp.access_token });
-        await loadOrCreateFile();
+        try { await loadOrCreateFile(); }
+        catch(e) { setState({ loading: false }); showToast('Error Drive: ' + e.message, 'error'); }
+      },
+      error_callback: (err) => {
+        setState({ loading: false });
+        if (err.type === 'popup_blocked_by_browser') {
+          showToast('Popup bloqueado — habilitá popups para este sitio', 'error');
+        } else { showToast('Error de autenticación: ' + err.type, 'error'); }
       }
     });
-    client.requestAccessToken();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    client.requestAccessToken({ prompt: 'consent' });
+  } catch(e) { setState({ loading: false }); showToast('Error: ' + e.message, 'error'); }
 }
 
 async function loadOrCreateFile() {
-  setState({ loading: true });
   try {
     const res = await gapi.client.drive.files.list({
       spaces: 'appDataFolder',
@@ -255,53 +272,37 @@ async function loadOrCreateFile() {
       fields: 'files(id,name)'
     });
     const files = res.result.files;
-    if (files.length > 0) {
-      state.fileId = files[0].id;
-      await loadData();
-    } else {
-      await createFile();
-    }
+    if (files.length > 0) { state.fileId = files[0].id; await loadData(); }
+    else { await createFile(); }
     setState({ view: 'doctors', loading: false });
-  } catch(e) { setState({ loading: false }); showToast('Error cargando datos', 'error'); }
-}
-
-async function createFile() {
-  const seed = getSeedData();
-  const meta = { name: FILE_NAME, parents: ['appDataFolder'] };
-  const body = JSON.stringify(seed);
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-  form.append('file', new Blob([body], { type: 'application/json' }));
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-    method: 'POST', headers: { Authorization: `Bearer ${state.token}` }, body: form
-  });
-  const data = await res.json();
-  state.fileId = data.id;
-  state.doctors = seed.doctors; state.patients = seed.patients; state.citas = seed.citas;
-}
-
-async function loadData() {
-  const res = await gapi.client.drive.files.get({ fileId: state.fileId, alt: 'media' });
-  const data = typeof res.result === 'string' ? JSON.parse(res.result) : res.result;
-  state.doctors = data.doctors || []; state.patients = data.patients || []; state.citas = data.citas || [];
+  } catch(e) {
+    setState({ loading: false });
+    const msg = e.result?.error?.message || e.message || 'Error';
+    showToast('Error Drive: ' + msg, 'error');
+  }
 }
 
 async function saveData() {
-  if (!state.fileId) return;
+  if (!state.fileId || !state.token) return;
   setState({ saving: true });
-  const body = JSON.stringify({ doctors: state.doctors, patients: state.patients, citas: state.citas });
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.fileId}?uploadType=media`, {
-    method: 'PATCH', headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': 'application/json' }, body
-  });
-  setState({ saving: false });
-  showToast('Guardado en Drive ✓', 'success');
+  try {
+    const body = JSON.stringify({ doctors: state.doctors, patients: state.patients, citas: state.citas });
+    const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': 'application/json' },
+      body
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setState({ saving: false });
+    showToast('Guardado en Drive ✓', 'success');
+  } catch(e) { setState({ saving: false }); showToast('Error guardando: ' + e.message, 'error'); }
 }
 
 // Local fallback (sin Google)
 function useLocalStorage() {
   const raw = localStorage.getItem('clinica_data');
   if (raw) { const d = JSON.parse(raw); state.doctors = d.doctors||[]; state.patients = d.patients||[]; state.citas = d.citas||[]; }
-  else { const s = getSeedData(); state.doctors=s.doctors; state.patients=s.patients; state.citas=s.citas; saveLocal(); }
+  else { const s = getSeedData(); state.doctors=s.doctors; state.patients=s.patients; state.citas=s.citas; }
   state.token = 'local'; setState({ view: 'doctors' });
 }
 
@@ -394,7 +395,7 @@ function renderAuth() {
       </button>
       <div style="margin:12px 0;display:flex;align-items:center;gap:10px"><hr style="flex:1;border-color:var(--border)"><span style="color:var(--text3);font-size:12px">o</span><hr style="flex:1;border-color:var(--border)"></div>
       <button class="btn" style="width:100%;justify-content:center" onclick="useLocalStorage()">Usar sin Google (datos locales)</button>
-
+      <div class="setup-note"><strong>⚙ ¿Primera vez?</strong> Si es la primera vez que usás esta app con Google, necesitás configurar un Client ID. <span style="cursor:pointer;text-decoration:underline" onclick="setState({view:'setup'})">Ver instrucciones →</span></div>
     </div>
   </div>`;
 }
@@ -426,9 +427,9 @@ function renderSetup() {
 }
 
 function applyClientId() {
-  const input = document.getElementById('client-id-input');
-  const v = input ? input.value.trim() : '';
-  if (!v) { showToast('Pegá tu Client ID primero', 'error'); return; }
+  const v = document.getElementById('client-id-input').value.trim();
+  if (!v) return;
+  // patch and reload
   const html = document.documentElement.outerHTML.replace('%%GOOGLE_CLIENT_ID%%', v);
   const blob = new Blob([html], {type:'text/html'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
