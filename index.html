@@ -214,7 +214,7 @@ async function apiPost(body) {
 
 // ── AUTH ───────────────────────────────────────────────────────────────────
 async function signIn() {
-  if (!SCRIPT_URL || SCRIPT_URL.includes('%%SCRIPT_URL%%')) {
+  if (!SCRIPT_URL || SCRIPT_URL.includes('SCRIPT_URL')) {
     showToast('Falta configurar la Script URL', 'error'); return;
   }
   const u = document.getElementById('login-user')?.value.trim();
