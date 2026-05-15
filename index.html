@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
+<html lang="es"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clínica · Sistema de Citas</title>
@@ -171,7 +169,29 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root">
+  <div id="auth-screen">
+    <div class="auth-card" style="max-width:560px;text-align:left">
+      <div style="font-size:22px;font-weight:700;margin-bottom:6px">⚙ Configuración de Google Drive</div>
+      <div style="color:var(--text2);font-size:13px;margin-bottom:20px">Solo se hace una vez. 5 minutos.</div>
+      <div class="setup-steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text">Ir a <strong><a href="https://console.cloud.google.com" target="_blank" style="color:var(--blue)">console.cloud.google.com</a></strong> y crear un proyecto nuevo.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">En el menú: <strong>APIs &amp; Services → Library</strong>. Buscar y habilitar <strong>Google Drive API</strong>.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong>. Tipo: <strong>Web application</strong>.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">En <strong>Authorized JavaScript origins</strong> agregar la URL donde abrís este archivo (ej: <code style="color:var(--blue)">http://localhost</code> o el dominio donde lo hosteés).</div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-text">Copiar el <strong>Client ID</strong> generado:</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="client-id-input" placeholder="xxxx.apps.googleusercontent.com" style="flex:1">
+          <button class="btn btn-primary" onclick="applyClientId()">Aplicar</button>
+        </div>
+        <div class="step"><div class="step-num">6</div><div class="step-text">O bien, abrí este archivo HTML en un editor de texto y reemplazá <code style="color:var(--amber)">274802525149-s7k98dd3j1cpqfucbeoilumd8jhmgho8.apps.googleusercontent.com</code> con tu Client ID, guardá y recargá.</div></div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:8px">
+        <button class="btn" onclick="setState({view:'auth'})">← Volver</button>
+        <button class="btn btn-success" onclick="useLocalStorage()">Usar sin Google por ahora</button>
+      </div>
+    </div>
+  </div></div>
 
 <script>
 const CLIENT_ID = '%%GOOGLE_CLIENT_ID%%';
@@ -808,5 +828,6 @@ function attachEvents() {}
 // ── INIT ───────────────────────────────────────────────────────────────────
 render();
 </script>
-</body>
-</html>
+
+
+</body></html>
